@@ -6,14 +6,23 @@ from datetime import datetime
 load_dotenv()
 app = Flask(__name__)
 
-WHATSAPP_TOKEN = "EAAK3KV6raVkBPimgb49XjOX1DCr9kJcX7dZBHUCh9KY8VQcOuGT9RRVKL8RXuZAJuHqrMMj7ZCyMXsuVV396kEfGaeqB39wxIaiA0rD6sq1vZAqMRnOiQAr5JvKFYZAwhD9fpfnAX5o3zyLZCiVoOXFufLwRG5XKsP2M9T50ZClQQ2SX7zAsfxH2fik1btBMr8IiBHivIyyXQvrroEx2YjmkpCsgDW3wCuZAJ8jZC9mpSLZCgZD" #os.getenv("WHATSAPP_TOKEN")
-PHONE_NUMBER_ID = "796239056896115" #os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-VERIFY_TOKEN = "TWSCodeJG#75" #os.getenv("WHATSAPP_VERIFY_TOKEN")
-DB_API_BASE = "https://appsintranet.esculapiosis.com/ApiCampbell/api" #os.getenv("DB_API_BASE")
-DB_API_KEY = "EAAK3KV6raVkBPimgb49XjOX1DCr9kJcX7dZBHUCh9KY8VQcOuGT9RRVKL8RXuZAJuHqrMMj7ZCyMXsuVV396kEfGaeqB39wxIaiA0rD6sq1vZAqMRnOiQAr5JvKFYZAwhD9fpfnAX5o3zyLZCiVoOXFufLwRG5XKsP2M9T50ZClQQ2SX7zAsfxH2fik1btBMr8IiBHivIyyXQvrroEx2YjmkpCsgDW3wCuZAJ8jZC9mpSLZCgZD" #os.getenv("DB_API_KEY")
+# WHATSAPP_TOKEN = "EAAK3KV6raVkBPimgb49XjOX1DCr9kJcX7dZBHUCh9KY8VQcOuGT9RRVKL8RXuZAJuHqrMMj7ZCyMXsuVV396kEfGaeqB39wxIaiA0rD6sq1vZAqMRnOiQAr5JvKFYZAwhD9fpfnAX5o3zyLZCiVoOXFufLwRG5XKsP2M9T50ZClQQ2SX7zAsfxH2fik1btBMr8IiBHivIyyXQvrroEx2YjmkpCsgDW3wCuZAJ8jZC9mpSLZCgZD" #os.getenv("WHATSAPP_TOKEN")
+# PHONE_NUMBER_ID = "796239056896115" #os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+# VERIFY_TOKEN = "TWSCodeJG#75" #os.getenv("WHATSAPP_VERIFY_TOKEN")
+# DB_API_BASE = "https://appsintranet.esculapiosis.com/ApiCampbell/api" #os.getenv("DB_API_BASE")
+# DB_API_KEY = "EAAK3KV6raVkBPimgb49XjOX1DCr9kJcX7dZBHUCh9KY8VQcOuGT9RRVKL8RXuZAJuHqrMMj7ZCyMXsuVV396kEfGaeqB39wxIaiA0rD6sq1vZAqMRnOiQAr5JvKFYZAwhD9fpfnAX5o3zyLZCiVoOXFufLwRG5XKsP2M9T50ZClQQ2SX7zAsfxH2fik1btBMr8IiBHivIyyXQvrroEx2YjmkpCsgDW3wCuZAJ8jZC9mpSLZCgZD" #os.getenv("DB_API_KEY")
+# VIDEO_BASE_URL = os.getenv("VIDEO_BASE_URL", "https://meet.jit.si")
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # opcional si usas OpenAI
+# ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")  # opcional si usas Claude
+
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
+VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN")
+DB_API_BASE = os.getenv("DB_API_BASE")
+DB_API_KEY = os.getenv("DB_API_KEY")
 VIDEO_BASE_URL = os.getenv("VIDEO_BASE_URL", "https://meet.jit.si")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")  # opcional si usas OpenAI
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")  # opcional si usas Claude
+#ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")  # opcional si usas Claude
 
 # ---- Estado simple en memoria (demo); en prod usa Redis/DB ----
 SESSION = {}  # dict: { user_wa_id: {"step": "...", "dni": "....", ...} }
@@ -102,9 +111,9 @@ def wa_send_cta_url(to, text, url, label="Abrir enlace"):
 def api_headers():
     return {"Authorization": f"Bearer {DB_API_KEY}"} if DB_API_KEY else {}
 
-def api_get_paciente_by_dni(dni):
+def api_get_paciente_by_dni(CodigoEmp,dni):
     try:
-        r = requests.get(f"{DB_API_BASE}/pacientes/{dni}", headers=api_headers(), timeout=20)
+        r = requests.get(f"{DB_API_BASE}/Pacientes/{CodigoEmp}/{dni}", headers=api_headers(), timeout=20)
         if r.status_code == 404: return None
         r.raise_for_status()
         return r.json()
@@ -112,12 +121,12 @@ def api_get_paciente_by_dni(dni):
         return None
 
 def api_create_paciente(payload):
-    r = requests.post(f"{DB_API_BASE}/pacientes", headers=api_headers(), json=payload, timeout=20)
+    r = requests.post(f"{DB_API_BASE}/Pacientes", headers=api_headers(), json=payload, timeout=20)
     r.raise_for_status()
     return r.json()
 
-def api_get_agenda(dni):
-    r = requests.get(f"{DB_API_BASE}/agenda?dni={dni}", headers=api_headers(), timeout=20)
+def api_get_agenda(CodigoEmp,dni):
+    r = requests.get(f"{DB_API_BASE}/CitasProgramadas?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
     r.raise_for_status()
     return r.json()
 
@@ -174,15 +183,16 @@ def handle_init(user):
     return "👋 Soy tu asistente virtual de Ortopedia.\nPor favor escribe tu *cédula* para continuar."
 
 def handle_dni(user, text):
+    CodigoEmp = "C30"
     dni = "".join([c for c in text if c.isdigit()])
     if not dni:
         return "❗ Debes enviar solo números de cédula. Intenta de nuevo."
     SESSION[user]["dni"] = dni
-    paciente = api_get_paciente_by_dni(dni)
+    paciente = api_get_paciente_by_dni(CodigoEmp,dni)
     if paciente:
         SESSION[user]["paciente"] = paciente
         SESSION[user]["step"] = "main_menu"
-        wa_send_text(user, f"✅ Encontrado: {paciente.get('nombre','(sin nombre)')} (CC {dni})")
+        wa_send_text(user, f"✅ Encontrado: {paciente.get('Paciente','(sin nombre)')} (CC {dni})")
         wa_send_list_menu(user)
         return None
     else:
@@ -222,15 +232,38 @@ def handle_menu_selection(user, selection_id):
 
     if selection_id == "op_agendar":
         SESSION[user]["step"] = "agendar"
+        CodigoEmp = "C30"
         dni = SESSION[user]["dni"]
         try:
-            agenda = api_get_agenda(dni)
+            agenda = api_get_agenda(CodigoEmp,dni)
             if not agenda:
                 return "📅 No hay programación disponible."
             lines = ["📅 *Agenda disponible:*"]
+            # for item in agenda:
+            #     lines.append(f"- {item.get('Fecha','')} {item.get('Hora','')} · {item.get('Medico','')}")
+            # return "\n".join(lines)
+            
             for item in agenda:
-                lines.append(f"- {item.get('fecha','')} {item.get('hora','')} · {item.get('doctor','')}")
-            return "\n".join(lines)
+                Paciente = item["Paciente"]
+                datoscitas = item["CodServicio"]
+                Fecha_Cita = item["Fecha"]
+                Hora_Cita = item["Hora"]
+                Observacion_Cita = item["Observacion"]
+                Medico = item["Medico"]
+                if datoscitas == "CE":
+                    CodServicio="Consulta Externa"
+                else:
+                    CodServicio = "Especialidad"
+
+            lines.append(f"- Paciente: {dni} {Paciente}") + "\n" 
+            lines.append(f"- Cita En: {CodServicio}") + "\n" 
+            lines.append(f"- Fecha: {Fecha_Cita}") + "\n" 
+            lines.append(f"- Hora:: {Hora_Cita}") + "\n" 
+            lines.append(f"- Medico: {Medico}") + "\n" 
+            lines.append(f"- Observacion: {Observacion_Cita}") + "\n" 
+          
+            #"Paciente: " + nocedula + " " + datospac + "\n 0️⃣. Cita en: " + CodServicio +"\n 1️⃣. Fecha: " + Fecha_Cita + "\n 2️⃣. Hora Cita: " + Hora_Cita + "\n 3️⃣. Observacion: " + Observacion_Cita + "\n 4️⃣. Medico de Atencion: " + Medico
+
         finally:
             wa_send_list_menu(user)
             SESSION[user]["step"] = "main_menu"

@@ -407,7 +407,7 @@ def home():
 def diag():
     try:
         r = requests.get(
-            f"https://graph.facebook.com/{API_VERSION}/{PHONE_NUMBER_ID}",
+            f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}",
             params={"access_token": WHATSAPP_TOKEN},
             timeout=20
         )

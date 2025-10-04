@@ -113,8 +113,13 @@ def api_headers():
 
 def api_get_paciente_by_dni(CodigoEmp,dni):
     try:
-        url = f"{DB_API_BASE}/Pacientes/{CodigoEmp}/{dni}"
-        r = requests.get(url, headers=api_headers(), timeout=20)
+        #url = f"{DB_API_BASE}/Pacientes/{CodigoEmp}/{dni}"
+        #r = requests.get(url, headers=api_headers(), timeout=20)
+        
+        api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/Pacientes" #f"{DB_API_BASE}/Pacientes" 
+        params = {"CodigoEmp": "C30", "criterio": dni}
+        r = requests.get(api_url, params=params)
+
         if r.status_code == 404:
             return None
         r.raise_for_status()
@@ -228,7 +233,8 @@ def handle_dni(user, text):
 
     SESSION[user]["dni"] = dni
     paciente = api_get_paciente_by_dni(CodigoEmp, dni)
-
+    app.logger.info("Paciente API resp: %s", json.dumps(paciente, ensure_ascii=False))
+ 
     if paciente:
         nombre = _extraer_nombre(paciente)
         SESSION[user]["paciente"] = paciente      # guarda el dict completo

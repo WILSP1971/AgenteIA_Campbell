@@ -64,15 +64,17 @@ def wa_send_list_menu(to):
             "title": "Opciones",
             "rows": [
               {"id": "op_consultas", "title": "1) Manejo de Consultas"},
-              {"id": "op_agendar",   "title": "2) Agendar o Solicitar Citas"},
-              {"id": "op_telefonos", "title": "3) Teléfonos de Atención"}
+              {"id": "op_agendar",   "title": "2) Agendar Citas"},
+              {"id": "op_telefonos", "title": "3) Contactanos"}
             ]
           }]
         }
       }
     }
     r = requests.post(wa_url("messages"), headers=wa_headers(), json=payload, timeout=30)
-    r.raise_for_status()
+    if not r.ok:
+        # Log del cuerpo exacto del error de Meta
+        raise requests.HTTPError(f"{r.status_code} {r.reason} | body={r.text}")
     return r.json()
 
 def wa_send_buttons(to, text, buttons):
@@ -133,17 +135,6 @@ def api_get_paciente_by_dni(CodigoEmp,dni):
         return None
     except Exception:
         return None
-    # try:
-    #     api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/Pacientes" #f"{DB_API_BASE}/Pacientes" 
-    #     params = {"CodigoEmp": "C30", "criterio": dni}
-    #     r = requests.get(api_url, params=params)
-        
-    #     #r = requests.get(f"{DB_API_BASE}/Pacientes?/{CodigoEmp}/{dni}", headers=api_headers(), timeout=20)
-    #     if r.status_code == 404: return None
-    #     #r.raise_for_status()
-    #     return r.json()
-    # except Exception:
-    #     return None
 
 def _extraer_nombre(p):
     if not p: 
@@ -240,31 +231,17 @@ def handle_dni(user, text):
         SESSION[user]["paciente"] = paciente      # guarda el dict completo
         SESSION[user]["step"] = "main_menu"
         wa_send_text(user, f"✅ Encontrado: {nombre} (CC {dni})")
-        wa_send_list_menu(user)
+        try:
+           wa_send_list_menu(user)
+        except requests.HTTPError as e:
+            app.logger.error("LIST ERROR: %s", e)  # mostrará body=... con la causa exacta
+        #wa_send_list_menu(user)
         return None
     else:
         SESSION[user]["step"] = "register_wait_name"
         return ("No encontré tu registro.\n"
                 "Por favor envía en *un solo mensaje*:\n"
                 "`Nombre Apellidos`")
-        
-    # dni = "".join([c for c in text if c.isdigit()])
-    # if not dni:
-    #     return "❗ Debes enviar solo números de cédula. Intenta de nuevo."
-    # SESSION[user]["dni"] = dni
-    # paciente = api_get_paciente_by_dni(CodigoEmp,dni)
-    # if paciente != []:
-    #     nompaciente = paciente["Paciente"]
-    #     SESSION[user]["paciente"] = paciente["Paciente"] #paciente
-    #     SESSION[user]["step"] = "main_menu"
-    #     wa_send_text(user, f"✅ Encontrado: {nompaciente} (CC {dni})") #{paciente.get('Paciente','(sin nombre)')}
-    #     wa_send_list_menu(user)
-    #     return None
-    # else:
-    #     SESSION[user]["step"] = "register_wait_name"
-    #     return ("No encontré tu registro.\n"
-    #             "Por favor envía en *un solo mensaje*:\n"
-    #             "`Nombre Apellidos`")
 
 def handle_register_name(user, text):
     nombre = " ".join(text.strip().split())

@@ -113,7 +113,7 @@ def api_headers():
 
 def api_get_paciente_by_dni(CodigoEmp,dni):
     try:
-        api_url = f"{DB_API_BASE}/Pacientes" 
+        api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/Pacientes" #f"{DB_API_BASE}/Pacientes" 
         params = {"CodigoEmp": "C30", "criterio": dni}
         r = requests.get(api_url, params=params)
         

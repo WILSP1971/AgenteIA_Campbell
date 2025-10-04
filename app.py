@@ -113,7 +113,7 @@ def api_headers():
 
 def api_get_paciente_by_dni(CodigoEmp,dni):
     try:
-        api_url = DB_API_BASE 
+        api_url = f"{DB_API_BASE}/Pacientes" 
         params = {"CodigoEmp": "C30", "criterio": dni}
         r = requests.get(api_url, params=params)
         
@@ -130,7 +130,7 @@ def api_create_paciente(payload):
     return r.json()
 
 def api_get_agenda(CodigoEmp,dni):
-    api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas"
+    api_url =  f"{DB_API_BASE}/CitasProgramadas" #"https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas"
     params = {"CodigoEmp": "C30", "criterio": dni}
     r = requests.get(api_url, params=params)
     
@@ -197,7 +197,7 @@ def handle_dni(user, text):
         return "❗ Debes enviar solo números de cédula. Intenta de nuevo."
     SESSION[user]["dni"] = dni
     paciente = api_get_paciente_by_dni(CodigoEmp,dni)
-    if paciente:
+    if paciente == []:
         SESSION[user]["paciente"] = paciente
         SESSION[user]["step"] = "main_menu"
         wa_send_text(user, f"✅ Encontrado: {paciente.get('Paciente','(sin nombre)')} (CC {dni})")

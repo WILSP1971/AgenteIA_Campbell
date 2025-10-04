@@ -118,8 +118,8 @@ def api_get_paciente_by_dni(CodigoEmp,dni):
         r = requests.get(api_url, params=params)
         
         #r = requests.get(f"{DB_API_BASE}/Pacientes?/{CodigoEmp}/{dni}", headers=api_headers(), timeout=20)
-        if r.status_code == 404: return "Error 3404" #None
-        r.raise_for_status()
+        if r.status_code == 404: return None
+        #r.raise_for_status()
         return r.json()
     except Exception:
         return None
@@ -197,7 +197,7 @@ def handle_dni(user, text):
         return "❗ Debes enviar solo números de cédula. Intenta de nuevo."
     SESSION[user]["dni"] = dni
     paciente = api_get_paciente_by_dni(CodigoEmp,dni)
-    if paciente == []:
+    if paciente != []:
         SESSION[user]["paciente"] = paciente
         SESSION[user]["step"] = "main_menu"
         wa_send_text(user, f"✅ Encontrado: {paciente.get('Paciente','(sin nombre)')} (CC {dni})")

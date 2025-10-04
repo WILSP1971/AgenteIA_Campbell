@@ -209,23 +209,6 @@ def ai_answer(prompt, context=None):
         resp = openai.ChatCompletion.create(model="gpt-4o-mini", messages=messages, temperature=0.2)
         return resp.choices[0].message["content"].strip()
 
-    if ANTHROPIC_API_KEY:
-        import anthropic
-        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-        sys_prompt = (
-            "Eres un asistente clínico de ortopedia. Responde claro y breve, "
-            "no sustituyes diagnóstico. Señala banderas rojas."
-        )
-        content = f"{('Contexto: ' + context) if context else ''}\nPregunta: {prompt}"
-        resp = client.messages.create(
-            model="claude-3-5-sonnet-20240620",
-            max_tokens=600,
-            temperature=0.2,
-            system=sys_prompt,
-            messages=[{"role":"user","content":content}]
-        )
-        return resp.content[0].text.strip()
-
     return "⚠️ No hay proveedor de IA configurado."
 
 # ---------- Flujo de conversación ----------
@@ -299,20 +282,21 @@ def handle_menu_selection(user, selection_id):
             wa_send_text(user, "⚠️ No pude mostrar el submenú. Intenta de nuevo.")
         return None
 
-
     if selection_id == "op_agendar":
         SESSION[user]["step"] = "agendar"
         CodigoEmp = "C30"
         dni = SESSION[user]["dni"]
         try:
             agenda = api_get_agenda(CodigoEmp,dni)
+            app.logger.info("Citas Programadas API resp: %s", json.dumps(agenda, ensure_ascii=False))
+
             if not agenda:
                 return "📅 No hay programación disponible."
+            
             lines = ["📅 *Agenda disponible:*"]
             # for item in agenda:
             #     lines.append(f"- {item.get('Fecha','')} {item.get('Hora','')} · {item.get('Medico','')}")
             # return "\n".join(lines)
-            
             for item in agenda:
                 Paciente = item["Paciente"]
                 datoscitas = item["CodServicio"]
@@ -325,15 +309,23 @@ def handle_menu_selection(user, selection_id):
                 else:
                     CodServicio = "Especialidad"
 
-            lines.append(f"- Paciente: {dni} {Paciente}") + "\n" 
-            lines.append(f"- Cita En: {CodServicio}") + "\n" 
-            lines.append(f"- Fecha: {Fecha_Cita}") + "\n" 
-            lines.append(f"- Hora:: {Hora_Cita}") + "\n" 
-            lines.append(f"- Medico: {Medico}") + "\n" 
-            lines.append(f"- Observacion: {Observacion_Cita}") + "\n" 
-          
-            #"Paciente: " + nocedula + " " + datospac + "\n 0️⃣. Cita en: " + CodServicio +"\n 1️⃣. Fecha: " + Fecha_Cita + "\n 2️⃣. Hora Cita: " + Hora_Cita + "\n 3️⃣. Observacion: " + Observacion_Cita + "\n 4️⃣. Medico de Atencion: " + Medico
-
+            # lines.append(f"- Paciente: {dni} {Paciente}") + "\n" 
+            # lines.append(f"- Cita En: {CodServicio}") + "\n" 
+            # lines.append(f"- Fecha: {Fecha_Cita}") + "\n" 
+            # lines.append(f"- Hora:: {Hora_Cita}") + "\n" 
+            # lines.append(f"- Medico: {Medico}") + "\n" 
+            # lines.append(f"- Observacion: {Observacion_Cita}") + "\n" 
+            #return "\n".join(lines)
+        
+            SESSION[user]["paciente"] = Paciente      # guarda el dict completo
+            SESSION[user]["step"] = "main_menu"
+            mensaje = "Paciente: " + dni + " " + Paciente + "\n 0️⃣. Cita en: " + CodServicio +"\n 1️⃣. Fecha: " + Fecha_Cita + "\n 2️⃣. Hora Cita: " + Hora_Cita + "\n 3️⃣. Observacion: " + Observacion_Cita + "\n 4️⃣. Medico de Atencion: " + Medico
+            wa_send_text(user, f"{mensaje}")
+            try:
+                wa_send_list_menu(user)
+            except requests.HTTPError as e:
+                app.logger.error("LIST ERROR: %s", e)  # mostrará body=... con la causa exacta
+            return None
         finally:
             wa_send_list_menu(user)
             SESSION[user]["step"] = "main_menu"

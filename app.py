@@ -64,7 +64,7 @@ def wa_send_list_menu(to):
             "title": "Opciones",
             "rows": [
               {"id": "op_consultas", "title": "1) Manejo de Consultas"},
-              {"id": "op_agendar",   "title": "2) Agendar Citas"},
+              {"id": "op_agendar",   "title": "2) Consultar Citas"},
               {"id": "op_telefonos", "title": "3) Contactanos"}
             ]
           }]
@@ -77,21 +77,32 @@ def wa_send_list_menu(to):
         raise requests.HTTPError(f"{r.status_code} {r.reason} | body={r.text}")
     return r.json()
 
+def wa_post(path, payload):
+    url = wa_url(path)
+    r = requests.post(url, headers=wa_headers(), json=payload, timeout=30)
+    if not r.ok:
+        # 👇 verás el JSON exacto de error de Meta en los logs
+        raise requests.HTTPError(f"{r.status_code} {r.reason} | body={r.text}")
+    return r.json()
+
 def wa_send_buttons(to, text, buttons):
-    # Botones rápidos (hasta 3)
+    # buttons = [{"id":"...", "title":"..."}]  # máx 3, title ≤ ~20 chars
     payload = {
-      "messaging_product":"whatsapp",
-      "to":to,
-      "type":"interactive",
-      "interactive":{
-        "type":"button",
-        "body":{"text": text},
-        "action":{"buttons":[{"type":"reply","reply":{"id":b["id"],"title":b["title"]}} for b in buttons]}
+      "messaging_product": "whatsapp",
+      "to": to,
+      "type": "interactive",
+      "interactive": {
+        "type": "button",
+        "body": {"text": text},  # ≤ 1024
+        "action": {
+          "buttons": [
+            {"type": "reply", "reply": {"id": b["id"], "title": b["title"]}}
+            for b in buttons
+          ]
+        }
       }
     }
-    r = requests.post(wa_url("messages"), headers=wa_headers(), json=payload, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    return wa_post("messages", payload)
 
 def wa_send_cta_url(to, text, url, label="Abrir enlace"):
     # Botón CTA URL para videollamada/portal orden
@@ -155,13 +166,25 @@ def api_create_paciente(payload):
     return r.json()
 
 def api_get_agenda(CodigoEmp,dni):
-    api_url =  f"{DB_API_BASE}/CitasProgramadas" #"https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas"
-    params = {"CodigoEmp": "C30", "criterio": dni}
-    r = requests.get(api_url, params=params)
+    try:
+        api_url =  f"{DB_API_BASE}/CitasProgramadas" #"https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas"
+        params = {"CodigoEmp": "C30", "criterio": dni}
+        r = requests.get(api_url, params=params)
     
-    #r = requests.get(f"{DB_API_BASE}/CitasProgramadas?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
-    r.raise_for_status()
-    return r.json()
+        #r = requests.get(f"{DB_API_BASE}/CitasProgramadas?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        data = r.json()
+
+        # Normaliza: si viene lista, toma el primero
+        if isinstance(data, list):
+            return data[0] if data else None
+        if isinstance(data, dict):
+            return data
+        return None
+    except Exception:
+        return None
 
 def api_get_telefonos():
     r = requests.get(f"{DB_API_BASE}/telefonos", headers=api_headers(), timeout=20)
@@ -261,16 +284,21 @@ def handle_register_name(user, text):
 def handle_menu_selection(user, selection_id):
     if selection_id == "op_consultas":
         SESSION[user]["step"] = "consultas_menu"
-        wa_send_buttons(
-            user,
-            "Manejo de Consultas:\nSelecciona una opción:",
-            [
-                {"id":"c_hablar_doctor","title":"Hablar con Doctor (IA)"},
-                {"id":"c_orden_estudio","title":"Generar Orden Estudio"},
-                {"id":"c_videollamada","title":"Videollamada"}
-            ]
-        )
+        try:
+            wa_send_buttons(
+                user,
+                "Manejo de Consultas:\nSelecciona una opción:",
+                [
+                    {"id": "c_hablar_doctor", "title": "Consulta IA"},    # <= 12
+                    {"id": "c_orden_estudio", "title": "Orden Estudio"},  # <= 14
+                    {"id": "c_videollamada",  "title": "Videollamada"}    # <= 12
+                ]
+            )
+        except requests.HTTPError as e:
+            app.logger.error("BUTTONS ERROR: %s", e)  # verás body=... con la causa
+            wa_send_text(user, "⚠️ No pude mostrar el submenú. Intenta de nuevo.")
         return None
+
 
     if selection_id == "op_agendar":
         SESSION[user]["step"] = "agendar"

@@ -403,6 +403,30 @@ def home():
         'message': 'Webhook de WhatsApp funcionando'
     })
 
+@app.get("/diag")
+def diag():
+    try:
+        r = requests.get(
+            f"https://graph.facebook.com/{API_VERSION}/{PHONE_NUMBER_ID}",
+            params={"access_token": WHATSAPP_TOKEN},
+            timeout=20
+        )
+        ok = r.ok
+        data = r.json()
+    except Exception as e:
+        ok = False
+        data = {"error": str(e)}
+    # Muestra longitudes para evitar exponer secretos completos
+    return jsonify({
+        "env": {
+            "PHONE_NUMBER_ID": PHONE_NUMBER_ID,
+            "TOKEN_len": len(WHATSAPP_TOKEN) if WHATSAPP_TOKEN else 0
+        },
+        "graph_check_ok": ok,
+        "graph_response": data
+    })
+
+
 # @app.get("/")
 # def root():
 #     return {"ok": True, "msg": "WhatsApp backend running."}

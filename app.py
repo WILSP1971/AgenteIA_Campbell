@@ -198,9 +198,10 @@ def handle_dni(user, text):
     SESSION[user]["dni"] = dni
     paciente = api_get_paciente_by_dni(CodigoEmp,dni)
     if paciente != []:
-        SESSION[user]["paciente"] = paciente
+        nompaciente = paciente["Paciente"]
+        SESSION[user]["paciente"] = paciente["Paciente"] #paciente
         SESSION[user]["step"] = "main_menu"
-        wa_send_text(user, f"✅ Encontrado: {paciente.get('Paciente','(sin nombre)')} (CC {dni})")
+        wa_send_text(user, f"✅ Encontrado: {nompaciente} (CC {dni})") #{paciente.get('Paciente','(sin nombre)')}
         wa_send_list_menu(user)
         return None
     else:

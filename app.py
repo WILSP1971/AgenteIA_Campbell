@@ -113,7 +113,11 @@ def api_headers():
 
 def api_get_paciente_by_dni(CodigoEmp,dni):
     try:
-        r = requests.get(f"{DB_API_BASE}/Pacientes?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
+        api_url = DB_API_BASE 
+        params = {"CodigoEmp": "C30", "criterio": dni}
+        r = requests.get(api_url, params=params)
+        
+        #r = requests.get(f"{DB_API_BASE}/Pacientes?/{CodigoEmp}/{dni}", headers=api_headers(), timeout=20)
         if r.status_code == 404: return None
         r.raise_for_status()
         return r.json()
@@ -126,7 +130,11 @@ def api_create_paciente(payload):
     return r.json()
 
 def api_get_agenda(CodigoEmp,dni):
-    r = requests.get(f"{DB_API_BASE}/CitasProgramadas?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
+    api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas"
+    params = {"CodigoEmp": "C30", "criterio": dni}
+    r = requests.get(api_url, params=params)
+    
+    #r = requests.get(f"{DB_API_BASE}/CitasProgramadas?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
     r.raise_for_status()
     return r.json()
 

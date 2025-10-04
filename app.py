@@ -113,16 +113,45 @@ def api_headers():
 
 def api_get_paciente_by_dni(CodigoEmp,dni):
     try:
-        api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/Pacientes" #f"{DB_API_BASE}/Pacientes" 
-        params = {"CodigoEmp": "C30", "criterio": dni}
-        r = requests.get(api_url, params=params)
-        
-        #r = requests.get(f"{DB_API_BASE}/Pacientes?/{CodigoEmp}/{dni}", headers=api_headers(), timeout=20)
-        if r.status_code == 404: return None
-        #r.raise_for_status()
-        return r.json()
+        url = f"{DB_API_BASE}/Pacientes/{CodigoEmp}/{dni}"
+        r = requests.get(url, headers=api_headers(), timeout=20)
+        if r.status_code == 404:
+            return None
+        r.raise_for_status()
+        data = r.json()
+
+        # Normaliza: si viene lista, toma el primero
+        if isinstance(data, list):
+            return data[0] if data else None
+        if isinstance(data, dict):
+            return data
+        return None
     except Exception:
         return None
+    # try:
+    #     api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/Pacientes" #f"{DB_API_BASE}/Pacientes" 
+    #     params = {"CodigoEmp": "C30", "criterio": dni}
+    #     r = requests.get(api_url, params=params)
+        
+    #     #r = requests.get(f"{DB_API_BASE}/Pacientes?/{CodigoEmp}/{dni}", headers=api_headers(), timeout=20)
+    #     if r.status_code == 404: return None
+    #     #r.raise_for_status()
+    #     return r.json()
+    # except Exception:
+    #     return None
+
+def _extraer_nombre(p):
+    if not p: 
+        return "(sin nombre)"
+    # Intenta campos comunes
+    for k in ("Paciente", "nombre", "NombreCompleto", "fullName"):
+        if k in p and p[k]:
+            return str(p[k]).strip()
+    # Si tu API separa nombres y apellidos:
+    nombres = str(p.get("Nombres", "")).strip()
+    apellidos = str(p.get("Apellidos", "")).strip()
+    combo = (nombres + " " + apellidos).strip()
+    return combo or "(sin nombre)"
 
 def api_create_paciente(payload):
     r = requests.post(f"{DB_API_BASE}/Pacientes", headers=api_headers(), json=payload, timeout=20)
@@ -192,16 +221,19 @@ def handle_init(user):
 
 def handle_dni(user, text):
     CodigoEmp = "C30"
-    dni = "".join([c for c in text if c.isdigit()])
+
+    dni = "".join(c for c in text if c.isdigit())
     if not dni:
         return "❗ Debes enviar solo números de cédula. Intenta de nuevo."
+
     SESSION[user]["dni"] = dni
-    paciente = api_get_paciente_by_dni(CodigoEmp,dni)
-    if paciente != []:
-        nompaciente = paciente["Paciente"]
-        SESSION[user]["paciente"] = paciente["Paciente"] #paciente
+    paciente = api_get_paciente_by_dni(CodigoEmp, dni)
+
+    if paciente:
+        nombre = _extraer_nombre(paciente)
+        SESSION[user]["paciente"] = paciente      # guarda el dict completo
         SESSION[user]["step"] = "main_menu"
-        wa_send_text(user, f"✅ Encontrado: {nompaciente} (CC {dni})") #{paciente.get('Paciente','(sin nombre)')}
+        wa_send_text(user, f"✅ Encontrado: {nombre} (CC {dni})")
         wa_send_list_menu(user)
         return None
     else:
@@ -209,6 +241,24 @@ def handle_dni(user, text):
         return ("No encontré tu registro.\n"
                 "Por favor envía en *un solo mensaje*:\n"
                 "`Nombre Apellidos`")
+        
+    # dni = "".join([c for c in text if c.isdigit()])
+    # if not dni:
+    #     return "❗ Debes enviar solo números de cédula. Intenta de nuevo."
+    # SESSION[user]["dni"] = dni
+    # paciente = api_get_paciente_by_dni(CodigoEmp,dni)
+    # if paciente != []:
+    #     nompaciente = paciente["Paciente"]
+    #     SESSION[user]["paciente"] = paciente["Paciente"] #paciente
+    #     SESSION[user]["step"] = "main_menu"
+    #     wa_send_text(user, f"✅ Encontrado: {nompaciente} (CC {dni})") #{paciente.get('Paciente','(sin nombre)')}
+    #     wa_send_list_menu(user)
+    #     return None
+    # else:
+    #     SESSION[user]["step"] = "register_wait_name"
+    #     return ("No encontré tu registro.\n"
+    #             "Por favor envía en *un solo mensaje*:\n"
+    #             "`Nombre Apellidos`")
 
 def handle_register_name(user, text):
     nombre = " ".join(text.strip().split())

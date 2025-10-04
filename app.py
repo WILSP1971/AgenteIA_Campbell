@@ -361,6 +361,32 @@ def handle_orden_estudio(user, text):
     SESSION[user]["step"] = "main_menu"
     return None
 
+# ---- helpers de fallback ----
+def map_mainmenu_text_to_id(text: str):
+    t = (text or "").strip().lower()
+    if not t: 
+        return None
+    # admite "1", "1)", "1.", o el título completo
+    if t.startswith("1") or "manejo de consultas" in t:
+        return "op_consultas"
+    if t.startswith("2") or "agendar" in t:
+        return "op_agendar"
+    if t.startswith("3") or "teléfonos" in t or "contact" in t:
+        return "op_telefonos"
+    return None
+
+def map_consultas_text_to_btn(text: str):
+    t = (text or "").strip().lower()
+    if not t:
+        return None
+    if t.startswith("1") or "hablar con doctor" in t or "ia" in t:
+        return "c_hablar_doctor"
+    if t.startswith("2") or "orden estudio" in t or "orden" in t:
+        return "c_orden_estudio"
+    if t.startswith("3") or "videollamada" in t:
+        return "c_videollamada"
+    return None
+
 # ---------- Webhook ----------
 @app.route("/webhook", methods=["GET"])
 def verify():
@@ -409,6 +435,24 @@ def receive():
 
         # Máquina de estados básica
         step = session["step"]
+        app.logger.info("MSG TYPE=%s INTERACTIVE=%s TEXT=%s", msg.get("type"), bool(msg.get("interactive")), text)
+
+        # Fallback cuando el cliente envía texto en lugar de interactive.list_reply
+        if step == "main_menu" and text:
+            sel = map_mainmenu_text_to_id(text)
+            if sel:
+                out = handle_menu_selection(wa_id, sel)
+                if out: wa_send_text(wa_id, out)
+                return "ok", 200
+
+        # Fallback cuando el cliente responde el submenú por texto
+        if step == "consultas_menu" and text:
+            btn = map_consultas_text_to_btn(text)
+            if btn:
+                out = handle_consultas_buttons(wa_id, btn)
+                if out: wa_send_text(wa_id, out)
+                return "ok", 200
+        
         if step == "init":
             wa_send_text(wa_id, handle_init(wa_id))
         elif step == "ask_dni":

@@ -166,26 +166,26 @@ def api_create_paciente(payload):
     r.raise_for_status()
     return r.json()
 
-def api_get_agenda(CodigoEmp,dni):
+def api_get_agenda(CodigoEmp, dni):
     try:
-        api_url =  f"{DB_API_BASE}/CitasProgramadas" #"https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas"
-        params = {"CodigoEmp": "C30", "criterio": dni}
-        r = requests.get(api_url, params=params)
-    
-        #r = requests.get(f"{DB_API_BASE}/CitasProgramadas?CodigoEmp={CodigoEmp}&dni={dni}", headers=api_headers(), timeout=20)
+        api_url = f"{DB_API_BASE}/CitasProgramadas"
+        params = {"CodigoEmp": CodigoEmp, "criterio": dni}
+        r = requests.get(api_url, params=params, headers=api_headers(), timeout=20)
+
         if r.status_code == 404:
-            return None
+            return []
         r.raise_for_status()
         data = r.json()
 
-        # Normaliza: si viene lista, toma el primero
+        # Asegura lista
         if isinstance(data, list):
-            return data[0] if data else None
-        if isinstance(data, dict):
             return data
-        return None
-    except Exception:
-        return None
+        if isinstance(data, dict):
+            return [data]
+        return []
+    except Exception as e:
+        app.logger.error("Error en api_get_agenda: %s", e)
+        return []
 
 def api_get_telefonos():
     r = requests.get(f"{DB_API_BASE}/telefonos", headers=api_headers(), timeout=20)
@@ -241,7 +241,7 @@ def handle_dni(user, text):
         nombre = _extraer_nombre(paciente)
         SESSION[user]["paciente"] = paciente      # guarda el dict completo
         SESSION[user]["step"] = "main_menu"
-        wa_send_text(user, f"✅ Encontrado: {nombre} (CC {dni})")
+        wa_send_text(user, f"✅ Paciente Registrado: {nombre} (CC {dni})")
         try:
            wa_send_list_menu(user)
         except requests.HTTPError as e:
@@ -291,49 +291,85 @@ def handle_menu_selection(user, selection_id):
         SESSION[user]["step"] = "agendar"
         CodigoEmp = "C30"
         dni = SESSION[user]["dni"]
-        try:
-            agenda = api_get_agenda(CodigoEmp,dni)
-            app.logger.info("Citas Programadas API resp: %s", json.dumps(agenda, ensure_ascii=False))
 
-            if not agenda:
-                return "📅 No hay programación disponible."
+        agenda = api_get_agenda(CodigoEmp, dni)
+        app.logger.info("Citas Programadas API resp: %s", json.dumps(agenda, ensure_ascii=False))
+
+        if not agenda:
+            return "📅 No hay programación disponible."
+
+        lines = ["📅 *Agenda disponible:*"]
+        for item in agenda:
+            paciente = item.get("Paciente", "(sin nombre)")
+            codserv = "Consulta Externa" if item.get("CodServicio") == "CE" else "Especialidad"
+            fecha = item.get("Fecha", "")
+            hora = item.get("Hora", "")
+            obs = item.get("Observacion", "")
+            medico = item.get("Medico", "")
+
+            lines.append(
+                f"- Paciente: {dni} {paciente}\n"
+                f"  Cita en: {codserv}\n"
+                f"  Fecha: {fecha}\n"
+                f"  Hora: {hora}\n"
+                f"  Observación: {obs}\n"
+                f"  Médico: {medico}\n"
+            )
+
+        SESSION[user]["step"] = "main_menu"
+        mensaje = "\n".join(lines)
+        wa_send_text(user, mensaje)
+        wa_send_list_menu(user)
+        return None
+
+
+    # if selection_id == "op_agendar":
+    #     SESSION[user]["step"] = "agendar"
+    #     CodigoEmp = "C30"
+    #     dni = SESSION[user]["dni"]
+    #     try:
+    #         agenda = api_get_agenda(CodigoEmp,dni)
+    #         app.logger.info("Citas Programadas API resp: %s", json.dumps(agenda, ensure_ascii=False))
+
+    #         if not agenda:
+    #             return "📅 No hay programación disponible."
             
-            lines = ["📅 *Agenda disponible:*"]
-            # for item in agenda:
-            #     lines.append(f"- {item.get('Fecha','')} {item.get('Hora','')} · {item.get('Medico','')}")
-            # return "\n".join(lines)
-            for item in agenda:
-                Paciente = item["Paciente"]
-                datoscitas = item["CodServicio"]
-                Fecha_Cita = item["Fecha"]
-                Hora_Cita = item["Hora"]
-                Observacion_Cita = item["Observacion"]
-                Medico = item["Medico"]
-                if datoscitas == "CE":
-                    CodServicio="Consulta Externa"
-                else:
-                    CodServicio = "Especialidad"
+    #         lines = ["📅 *Agenda disponible:*"]
+    #         # for item in agenda:
+    #         #     lines.append(f"- {item.get('Fecha','')} {item.get('Hora','')} · {item.get('Medico','')}")
+    #         # return "\n".join(lines)
+    #         for item in agenda:
+    #             Paciente = item["Paciente"]
+    #             datoscitas = item["CodServicio"]
+    #             Fecha_Cita = item["Fecha"]
+    #             Hora_Cita = item["Hora"]
+    #             Observacion_Cita = item["Observacion"]
+    #             Medico = item["Medico"]
+    #             if datoscitas == "CE":
+    #                 CodServicio="Consulta Externa"
+    #             else:
+    #                 CodServicio = "Especialidad"
 
-            # lines.append(f"- Paciente: {dni} {Paciente}") + "\n" 
-            # lines.append(f"- Cita En: {CodServicio}") + "\n" 
-            # lines.append(f"- Fecha: {Fecha_Cita}") + "\n" 
-            # lines.append(f"- Hora:: {Hora_Cita}") + "\n" 
-            # lines.append(f"- Medico: {Medico}") + "\n" 
-            # lines.append(f"- Observacion: {Observacion_Cita}") + "\n" 
-            #return "\n".join(lines)
+    #         # lines.append(f"- Paciente: {dni} {Paciente}") + "\n" 
+    #         # lines.append(f"- Cita En: {CodServicio}") + "\n" 
+    #         # lines.append(f"- Fecha: {Fecha_Cita}") + "\n" 
+    #         # lines.append(f"- Hora:: {Hora_Cita}") + "\n" 
+    #         # lines.append(f"- Medico: {Medico}") + "\n" 
+    #         # lines.append(f"- Observacion: {Observacion_Cita}") + "\n" 
+    #         #return "\n".join(lines)
         
-            SESSION[user]["paciente"] = Paciente      # guarda el dict completo
-            SESSION[user]["step"] = "main_menu"
-            mensaje = "Paciente: " + dni + " " + Paciente + "\n 0️⃣. Cita en: " + CodServicio +"\n 1️⃣. Fecha: " + Fecha_Cita + "\n 2️⃣. Hora Cita: " + Hora_Cita + "\n 3️⃣. Observacion: " + Observacion_Cita + "\n 4️⃣. Medico de Atencion: " + Medico
-            wa_send_text(user, f"{mensaje}")
-            try:
-                wa_send_list_menu(user)
-            except requests.HTTPError as e:
-                app.logger.error("LIST ERROR: %s", e)  # mostrará body=... con la causa exacta
-            return None
-        finally:
-            wa_send_list_menu(user)
-            SESSION[user]["step"] = "main_menu"
+    #         SESSION[user]["paciente"] = Paciente      # guarda el dict completo
+    #         SESSION[user]["step"] = "main_menu"
+    #         mensaje = "Paciente: " + dni + " " + Paciente + "\n 0️⃣. Cita en: " + CodServicio +"\n 1️⃣. Fecha: " + Fecha_Cita + "\n 2️⃣. Hora Cita: " + Hora_Cita + "\n 3️⃣. Observacion: " + Observacion_Cita + "\n 4️⃣. Medico de Atencion: " + Medico
+    #         wa_send_text(user, f"{mensaje}")
+    #         try:
+    #             wa_send_list_menu(user)
+    #         except requests.HTTPError as e:
+    #             app.logger.error("LIST ERROR: %s", e)  # mostrará body=... con la causa exacta
+    #         return None
+    #     finally:
+    #         wa_send_list_menu(user)
+    #         SESSION[user]["step"] = "main_menu"
 
     if selection_id == "op_telefonos":
         SESSION[user]["step"] = "telefonos"

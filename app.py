@@ -168,9 +168,9 @@ def api_create_paciente(payload):
 
 def api_get_agenda(CodigoEmp, dni):
     try:
-        api_url = f"{DB_API_BASE}/CitasProgramadas"
+        api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/CitasProgramadas" #f"{DB_API_BASE}/CitasProgramadas"
         params = {"CodigoEmp": CodigoEmp, "criterio": dni}
-        r = requests.get(api_url, params=params, headers=api_headers(), timeout=20)
+        r = requests.get(api_url, params=params) #
 
         if r.status_code == 404:
             return []
@@ -316,10 +316,16 @@ def handle_menu_selection(user, selection_id):
                 f"  Médico: {medico}\n"
             )
 
+        SESSION[user]["paciente"] = paciente      # guarda el dict completo
         SESSION[user]["step"] = "main_menu"
-        mensaje = "\n".join(lines)
-        wa_send_text(user, mensaje)
-        wa_send_list_menu(user)
+        #mensaje = "\n".join(lines)
+        mensaje = "Paciente: " + dni + " " + paciente + "\n 0️⃣. Cita en: " + codserv +"\n 1️⃣. Fecha: " + fecha + "\n 2️⃣. Hora Cita: " + hora + "\n 3️⃣. Observacion: " + obs + "\n 4️⃣. Medico de Atencion: " + medico
+ 
+        wa_send_text(user, f"{mensaje}")
+        try:
+            wa_send_list_menu(user)
+        except requests.HTTPError as e:
+            app.logger.error("LIST ERROR: %s", e)  # mostrará body=... con la causa exacta
         return None
 
 

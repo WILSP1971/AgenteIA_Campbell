@@ -296,7 +296,9 @@ def handle_menu_selection(user, selection_id):
         app.logger.info("Citas Programadas API resp: %s", json.dumps(agenda, ensure_ascii=False))
 
         if not agenda:
+            wa_send_list_menu(user)
             return "📅 No hay programación disponible."
+            
 
         lines = ["📅 *Agenda disponible:*"]
         for item in agenda:

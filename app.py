@@ -2,6 +2,7 @@ import os, json, uuid, requests
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from datetime import datetime
+from openai import OpenAI
 
 load_dotenv()
 app = Flask(__name__)
@@ -195,19 +196,23 @@ def api_get_telefonos():
 def ai_answer(prompt, context=None):
     # Unifica: si configuras OPENAI usa GPT; si configuras ANTHROPIC usa Claude.
     if OPENAI_API_KEY:
-        import openai
-        openai.api_key = OPENAI_API_KEY
+        client = OpenAI(api_key=OPENAI_API_KEY)
         sys_prompt = (
             "Eres un asistente clínico de ortopedia. Responde claro y breve, "
             "con enfoque informativo; no reemplazas un diagnóstico médico. "
             "Incluye banderas rojas y sugerencias de exámenes de imagen cuando corresponda."
         )
         messages = [{"role":"system","content":sys_prompt}]
-        if context: messages.append({"role":"system","content":f"Contexto paciente: {context}"})
+        if context:
+            messages.append({"role":"system","content":f"Contexto paciente: {context}"})
         messages.append({"role":"user","content":prompt})
-        # Modelo de ejemplo; ajusta al que tengas disponible
-        resp = openai.ChatCompletion.create(model="gpt-4o-mini", messages=messages, temperature=0.2)
-        return resp.choices[0].message["content"].strip()
+
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.2
+        )
+        return resp.choices[0].message.content.strip()
 
     return "⚠️ No hay proveedor de IA configurado."
 

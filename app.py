@@ -320,10 +320,10 @@ def handle_menu_selection(user, selection_id):
 
         SESSION[user]["paciente"] = paciente      # guarda el dict completo
         SESSION[user]["step"] = "main_menu"
-        #mensaje = "\n".join(lines)
-        mensaje = "Paciente: " + dni + " " + paciente + "\n 0️⃣. Cita en: " + codserv +"\n 1️⃣. Fecha: " + fecha + "\n 2️⃣. Hora Cita: " + hora + "\n 3️⃣. Observacion: " + obs + "\n 4️⃣. Medico de Atencion: " + medico
+        mensaje = "\n".join(lines)
+        #mensaje = "Paciente: " + dni + " " + paciente + "\n 0️⃣. Cita en: " + codserv +"\n 1️⃣. Fecha: " + fecha + "\n 2️⃣. Hora Cita: " + hora + "\n 3️⃣. Observacion: " + obs + "\n 4️⃣. Medico de Atencion: " + medico
  
-        wa_send_text(user, f"{mensaje}")
+        wa_send_text(user, mensaje)
         try:
             wa_send_list_menu(user)
         except requests.HTTPError as e:

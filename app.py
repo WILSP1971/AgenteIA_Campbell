@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 from openai import OpenAI
 from urllib.parse import quote
+import re
+
 
 load_dotenv()
 app = Flask(__name__)
@@ -58,7 +60,7 @@ def wa_send_list_menu(to):
       "type": "interactive",
       "interactive": {
         "type": "list",
-        "body": {"text": "Seleccione una opción del menú:"},
+        "body": {"text": "Seleccione una opción del menú((Escriba *Salir/Inicio* Para Salir)):"},
         "footer": {"text": "Agente Ortopedia"},
         "action": {
           "button": "Abrir menú",
@@ -278,6 +280,19 @@ def handle_register_name(user, text):
 
 def handle_menu_selection(user, selection_id):
     if selection_id == "op_consultas":
+        
+          # ✅ Validación: solo médicos pueden entrar
+        if not is_medico(user):
+            # Mensaje de no autorizado
+            wa_send_text(
+                user,
+                "⛔ No tienes autorización para acceder a *Manejo de Consultas*.\n"
+                "Si eres médico y necesitas acceso, por favor comunícate con soporte."
+            )
+            # Opcional: volver a mostrar el menú general
+            wa_send_list_menu(user)
+            return None
+        
         SESSION[user]["step"] = "consultas_menu"
         try:
             wa_send_buttons(
@@ -459,6 +474,68 @@ def map_consultas_text_to_btn(text: str):
     if t in {"salir", "menu", "menú", "volver", "inicio"}:
         return "c_salir"  # <- manejaremos este id especial
     return None
+
+def normalize_msisdn(wa_from: str) -> str:
+    """
+    Normaliza el número que llega en msg['from'] (E.164 sin '+').
+    Ya llega así normalmente (57XXXXXXXXXX), pero por si acaso limpiamos.
+    """
+    return re.sub(r"\D+", "", wa_from or "")
+
+def api_is_medico_by_phone(msisdn: str) -> bool:
+    """
+    Consulta tu API para saber si este teléfono pertenece a un médico.
+    Ajusta la URL al endpoint real que tengas.
+    Ejemplos posibles:
+      GET {DB_API_BASE}/Medicos/byPhone/{msisdn}
+      GET {DB_API_BASE}/Medicos?phone=57XXXXXXXXXX
+    Esta versión usa un endpoint tipo /Medicos/byPhone/{msisdn}
+    y asume que 200 = existe, 404 = no existe.
+    """
+    try:
+        api_url = "https://appsintranet.esculapiosis.com/ApiCampbell/api/Medicos" #f"{DB_API_BASE}/Pacientes" 
+        params = {"CodigoEmp": "C30", "criterio": msisdn}
+        r = requests.get(api_url, params=params)
+
+        if r.status_code == 404:
+            return False
+        r.raise_for_status()
+        data = r.json()
+        
+        # Acepta dict o lista no vacía como "es médico"
+        if isinstance(data, dict):
+            return True
+        if isinstance(data, list):
+            return len(data) > 0
+        return False
+    except Exception as e:
+        app.logger.error("Error en la API Metodo del Medico: %s", e)
+        # En caso de error de API, por seguridad niega acceso.
+        return False
+
+def is_medico(wa_id: str) -> bool:
+    """
+    Orquestador: primero cache en sesión, luego ENV allowlist, luego API.
+    """
+    sess = ensure_session(wa_id)
+    if "is_medico" in sess:
+        return bool(sess["is_medico"])
+
+    msisdn = normalize_msisdn(wa_id)
+
+    # 1) Lista blanca por ENV (rápida)
+    allow_env = os.getenv("MEDICOS_ALLOW", "")
+    if allow_env:
+        allow = {re.sub(r"\D+", "", p) for p in allow_env.split(",") if p.strip()}
+        if msisdn in allow:
+            sess["is_medico"] = True
+            return True
+
+    # 2) Consulta a la API
+    ok = api_is_medico_by_phone(msisdn)
+    sess["is_medico"] = ok
+    return ok
+
 
 # ---------- Webhook ----------
 @app.route("/webhook", methods=["GET"])

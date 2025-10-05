@@ -107,20 +107,42 @@ def wa_send_buttons(to, text, buttons):
     return wa_post("messages", payload)
 
 def wa_send_cta_url(to, text, url, label="Abrir enlace"):
-    # Botón CTA URL para videollamada/portal orden
     payload = {
       "messaging_product":"whatsapp",
-      "to":to,
+      "to": to,
       "type":"interactive",
       "interactive":{
         "type":"cta_url",
-        "body":{"text": text},
-        "action":{"name":"cta_url","parameters":{"display_text":label,"url":url}}
+        "body":{"text": text},                      # <= 1024 chars
+        "action":{"name":"cta_url","parameters":{
+          "display_text": label,                    # <= ~20 chars
+          "url": url
+        }}
       }
     }
-    r = requests.post(wa_url("messages"), headers=wa_headers(), json=payload, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    try:
+        return wa_post("messages", payload)
+    except requests.HTTPError as e:
+        # Si tu versión de Graph / app no soporta cta_url, cae aquí.
+        app.logger.error("CTA_URL no soportado o inválido: %s", e)
+        # Fallback robusto: texto con el link clickeable
+        return wa_send_text(to, f"{text}\n\n🔗 {url}")
+
+# def wa_send_cta_url(to, text, url, label="Abrir enlace"):
+#     # Botón CTA URL para videollamada/portal orden
+#     payload = {
+#       "messaging_product":"whatsapp",
+#       "to":to,
+#       "type":"interactive",
+#       "interactive":{
+#         "type":"cta_url",
+#         "body":{"text": text},
+#         "action":{"name":"cta_url","parameters":{"display_text":label,"url":url}}
+#       }
+#     }
+#     r = requests.post(wa_url("messages"), headers=wa_headers(), json=payload, timeout=30)
+#     r.raise_for_status()
+#     return r.json()
 
 # ---------- Tu API (BD) ----------
 def api_headers():

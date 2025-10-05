@@ -128,22 +128,6 @@ def wa_send_cta_url(to, text, url, label="Abrir enlace"):
         # Fallback robusto: texto con el link clickeable
         return wa_send_text(to, f"{text}\n\n🔗 {url}")
 
-# def wa_send_cta_url(to, text, url, label="Abrir enlace"):
-#     # Botón CTA URL para videollamada/portal orden
-#     payload = {
-#       "messaging_product":"whatsapp",
-#       "to":to,
-#       "type":"interactive",
-#       "interactive":{
-#         "type":"cta_url",
-#         "body":{"text": text},
-#         "action":{"name":"cta_url","parameters":{"display_text":label,"url":url}}
-#       }
-#     }
-#     r = requests.post(wa_url("messages"), headers=wa_headers(), json=payload, timeout=30)
-#     r.raise_for_status()
-#     return r.json()
-
 # ---------- Tu API (BD) ----------
 def api_headers():
     return {"Authorization": f"Bearer {DB_API_KEY}"} if DB_API_KEY else {}
@@ -298,7 +282,7 @@ def handle_menu_selection(user, selection_id):
         try:
             wa_send_buttons(
                 user,
-                "Manejo de Consultas:\nSelecciona una opción:",
+                "Manejo de Consultas:\nSelecciona una opción (o escribe *Salir/Menu/Inicio* para volver al menú):",
                 [
                     {"id": "c_hablar_doctor", "title": "Consulta IA"},    # <= 12
                     {"id": "c_orden_estudio", "title": "Orden Estudio"},  # <= 14
@@ -369,10 +353,12 @@ def handle_consultas_buttons(user, btn_id):
     if btn_id == "c_hablar_doctor":
         SESSION[user]["step"] = "consultas_chat"
         return "🩺 Escribe tu pregunta de ortopedia. (Soy IA, no reemplazo consulta médica)."
+
     if btn_id == "c_orden_estudio":
         SESSION[user]["step"] = "orden_estudio"
         return ("¿Qué estudio necesitas generar?\n"
                 "- Rayos X\n- Resonancia\n- TAC\nEscribe uno.")
+
     if btn_id == "c_videollamada":
         # Construye un nombre de sala único y corto
         room = f"ortho-{uuid.uuid4().hex[:8]}"
@@ -392,6 +378,12 @@ def handle_consultas_buttons(user, btn_id):
         # Volver a mostrar menú principal
         wa_send_list_menu(user)
         return None
+
+    if btn_id == "c_salir":
+            SESSION[user]["step"] = "main_menu"
+            wa_send_text(user, "👋 Saliste de Manejo de Consultas. ¿En qué más te ayudo?")
+            wa_send_list_menu(user)
+            return None
 
     return "❓ Botón no reconocido."
 
@@ -464,6 +456,8 @@ def map_consultas_text_to_btn(text: str):
         return "c_orden_estudio"
     if t.startswith("3") or "videollamada" in t:
         return "c_videollamada"
+    if t in {"salir", "menu", "menú", "volver", "inicio"}:
+        return "c_salir"  # <- manejaremos este id especial
     return None
 
 # ---------- Webhook ----------
@@ -516,6 +510,14 @@ def receive():
         step = session["step"]
         app.logger.info("MSG TYPE=%s INTERACTIVE=%s TEXT=%s", msg.get("type"), bool(msg.get("interactive")), text)
 
+        EXIT_WORDS = {"salir", "menu", "menú", "volver", "inicio"}
+
+        if text and text.strip().lower() in EXIT_WORDS:
+            SESSION[wa_id]["step"] = "main_menu"
+            wa_send_text(wa_id, "👋 ¡Listo! He cerrado la consulta. Aquí tienes el menú principal.")
+            wa_send_list_menu(wa_id)
+            return "ok", 200
+        
         # Fallback cuando el cliente envía texto en lugar de interactive.list_reply
         if step == "main_menu" and text:
             sel = map_mainmenu_text_to_id(text)
